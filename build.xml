@@ -1,0 +1,112 @@
+<?xml version="1.0"?>
+<project basedir="." name="chacha-web-administration">
+
+	<property file="build.properties" />
+	<import file="${shared.xml}/ant/build-basic-targets.xml"/>
+	<import file="${shared.xml}/ant/build-eclipse-classpath.xml"/>
+	<import file="${shared.xml}/ant/build-findBugs-targets.xml" />
+	<import file="${shared.xml}/ant/build-pmd-targets.xml" />
+
+	<path id="dist.classpath">
+		<path refid="webapp.classpath.fileset" />
+	</path>
+
+	<path id="webapp.classpath.fileset">
+		<path refid="lib.jars" />
+	</path>
+
+	<path id="lib.jars">
+		<fileset dir="lib">
+			<include name="*.jar" />
+			<exclude name="**/*-sources.jar"/>
+			<exclude name="**/*-javadoc.jar"/>
+		</fileset>
+	</path>
+
+	<path id="project.classpath">
+		<path refid="webapp.classpath.fileset"/>
+	</path>
+
+	<target name="build-tests" depends="build">
+		<if>
+			<equals arg1="${should.clean}" arg2="true"/>
+			<then>
+				<delete dir="build-test" failonerror="false"/>
+			</then>
+		</if>
+		<mkdir dir="build-test"/>
+		<groovyc srcdir="${test.dir}" destdir="build-test">
+			<classpath>
+				<path location="build"/>
+				<path refid="project.classpath"/>
+				<path location="${jdk.lib}/tools.jar"/>
+			</classpath>
+			<javac source="1.6" target="1.6" debug="true" />
+		</groovyc>
+		<copy todir="build-test">
+			<fileset dir="${test.dir}">
+				<include name="**/*.properties"/>
+				<include name="**/*.xml"/>
+				<include name="**/*.drl"/>
+			</fileset>
+			<fileset dir="WebContent">
+				<include name="META-INF/**"/>
+			</fileset>
+		</copy>
+	</target>
+
+	<target name="dist-war" depends="build">
+		<delete file="${dist.war}" failonerror="false"/>
+		<mkdir dir="dist"/>
+
+		<delete dir="temp-war-deps" failonerror="false"/>
+		<mkdir dir="temp-war-deps"/>
+
+		<copy todir="temp-war-deps" flatten="true">
+			<path refid="webapp.classpath.fileset"/>
+		</copy>
+
+		<war destfile="${dist.war}" webxml="${conf.web.dir}/web.xml">
+			<classes dir="${build.dir}"/>
+			<classes dir="WebContent">
+				<include name="META-INF/**/*"/>
+			</classes>
+			<webinf dir="${conf.web.dir}">
+				<include name="*.xml"/>
+				<include name="*.xls"/>
+				<include name="*.drl"/>
+				<include name="*.properties"/>
+				<include name="*.security-properties"/>
+				<include name="*.policy"/>
+				<include name="*.config"/>
+				<include name="**/*.jsp"/>
+			</webinf>
+			<fileset dir="WebContent" erroronmissingdir="no">
+				<include name="pages/**/*.jsp"/>
+				<include name="tiles/**/*.jsp"/>
+				<include name="static/**/*"/>
+			</fileset>
+			<lib dir="temp-war-deps">
+				<exclude name="tomcat*"/>
+			</lib>
+			<metainf dir="WebContent/META-INF">
+				<include name="**/*"/>
+			</metainf>
+		</war>
+		<delete dir="temp-war-deps"/>
+	</target>
+
+	<target name="all" depends="build,report-tests,dist,create-javadoc"/>
+
+	<target name="console" depends="build, build-tests">
+		<java classname="groovy.ui.Console" fork="true">
+			<classpath>
+				<path path="build"/>
+				<path path="build-test"/>
+				<path refid="project.classpath"/>
+				<path refid="groovy.classpath"/>
+			</classpath>
+		</java>
+	</target>
+
+</project>
