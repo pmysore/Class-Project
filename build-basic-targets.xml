@@ -1,0 +1,352 @@
+<?xml version="1.0"?>
+<project default="all" basedir=".">
+	<import file="build-ant-contrib-targets.xml"/>
+	<import file="build-ivy-targets.xml"/>
+
+	<property file="placeholder.build.properties"/>
+
+	<property name="cobertura.report.dir" value="${report.dir}/junit-coverage"/>
+	<property name="instrumented.dir" value="${basedir}/temp/instrumented"/>
+	<property name="conf.dir" value="conf"/>
+	<property name="test.dir" value="test"/>
+	<property name="dist.war" value="dist/${archive.name}.war"/>
+	<property name="conf.web.dir" value="conf-web"/>
+	<property name="conf.jsp.dir" value="jsp"/>
+	<property name="jar.mainclass" value="com.chacha.spring.StartApp"/>
+	<property name="jdk.lib" value="${java.home}/../lib"/>
+
+	<property name="should.clean" value="true"/>
+
+	<!-- import this low so it can pick up the properties -->
+	<import file="build-testing-targets.xml"/>
+
+	<path id="cobertura.classpath">
+	    <fileset dir="${shared.lib}">
+	        <include name="cobertura/*.jar" />
+	        <include name="log4j/*.jar" />
+			<exclude name="log4j/*slf*"/>
+	    </fileset>
+	</path>
+
+	<path id="groovy.classpath">
+		<fileset dir="${shared.lib}">
+			<include name="groovy/*.jar" />
+		</fileset>
+	</path>
+
+	<taskdef classpathref="cobertura.classpath" resource="tasks.properties" />
+
+	<taskdef name="groovyc" classname="org.codehaus.groovy.ant.Groovyc" classpathref="groovy.classpath"/>
+
+	<path id="onejar.classpath">
+	    <fileset dir="${shared.lib}">
+	        <include name="onejar/*.jar" />
+	    </fileset>
+	</path>
+
+	<taskdef name="one-jar" classname="com.simontuffs.onejar.ant.OneJarTask">
+		<classpath refid="onejar.classpath"/>
+	</taskdef>
+
+	<target name="clean">
+		<delete dir="build" failonerror="false"/>
+		<delete dir="dist" failonerror="false"/>
+		<delete dir="bin" failonerror="false"/>
+		<delete dir="reports" failonerror="false"/>
+		<delete dir="build-test" failonerror="false"/>
+		<delete dir="generated-src" failonerror="false"/>
+	</target>
+
+	<target name="build">
+		<if>
+			<equals arg1="${should.clean}" arg2="true"/>
+			<then>
+				<delete dir="build" failonerror="false"/>
+			</then>
+		</if>
+		<mkdir dir="build"/>
+		<groovyc srcdir="${src.dir}" destdir="build">
+			<classpath>
+				<path refid="project.classpath"/>
+				<path location="${jdk.lib}/tools.jar"/>
+			</classpath>
+			<javac source="1.6" target="1.6" encoding="UTF-8" debug="true" deprecation="true"/>
+		</groovyc>
+		<copy todir="build">
+			<fileset dir="${src.dir}">
+				<include name="**/*.properties"/>
+				<include name="**/*.xml"/>
+				<include name="**/*.xsd"/>
+				<include name="**/TypeConverter"/>
+				<include name="**/camel/component/*"/>
+			</fileset>
+			<fileset dir="${conf.dir}">
+				<include name="**/*.xls"/>
+				<include name="**/*.drl"/>
+				<include name="**/*.properties"/>
+				<include name="**/*.xml"/>
+				<include name="**/*.xsd"/>
+				<include name="**/*.security-properties"/>
+				<include name="**/*.policy"/>
+				<include name="**/*.config"/>
+				<include name="**/*.vm"/>
+				<include name="**/*.txt"/>
+				<include name="**/*.jks"/>
+				<include name="**/*.model"/>
+				<include name="META-INF/**"/>
+			</fileset>
+			<!-- for nlp -->
+			<fileset dir=".">
+				<include name="data/stopwords/**"/>
+			</fileset>
+			<fileset dir=".">
+				<include name="data/stopwords/**"/>
+			</fileset>
+		</copy>
+	</target>
+
+	<target name="build-tests" depends="build">
+		<if>
+			<equals arg1="${should.clean}" arg2="true"/>
+			<then>
+				<delete dir="build-test" failonerror="false"/>
+			</then>
+		</if>
+		<mkdir dir="build-test"/>
+		<groovyc srcdir="${test.dir}" destdir="build-test">
+			<classpath>
+				<path location="build"/>
+				<path refid="project.classpath"/>
+				<path location="${jdk.lib}/tools.jar"/>
+			</classpath>
+			<javac source="1.6" target="1.6" debug="true" />
+		</groovyc>
+		<copy todir="build-test">
+			<fileset dir="${test.dir}">
+				<include name="**/*.properties"/>
+				<include name="**/*.xml"/>
+				<include name="**/*.drl"/>
+				<include name="**/*.yaml"/>
+			</fileset>
+		</copy>
+	</target>
+
+	<target name="run-master-testsuites" depends="build-tests">
+		<delete dir="${report.dir}/junit" failonerror="false"/>
+		<mkdir dir="${report.dir}/junit"/>
+		<junit printsummary="yes" showoutput="yes" maxmemory="1024m">
+
+			<sysproperty key="net.sourceforge.cobertura.datafile" value="${cobertura.report.dir}/cobertura.ser" />
+			<classpath path="${instrumented.dir}"/>
+			<classpath path="${shared.lib}/junit/junit-4*.jar"/>
+			<classpath path="build"/>
+			<classpath path="build-test"/>
+			<classpath path="conf"/>
+			<classpath refid="project.classpath"/>
+			<classpath refid="cobertura.classpath" />
+			<classpath path="${shared.lib}/clover-ant-2.3.2/lib/clover.jar" />
+
+			<sysproperty key="java.protocol.handler.pkgs" value="com.chacha.protocol"/>
+			<formatter type="xml"/>
+
+			<batchtest fork="yes" todir="${report.dir}/junit">
+				<fileset dir="build-test">
+					<include name="**/*MasterTestSuite.class"/>
+				</fileset>
+			</batchtest>
+		</junit>
+	</target>
+
+	<target name="report-tests" depends="run-tests">
+		<delete dir="${report.dir}/junit-report" failonerror="false"/>
+		<mkdir dir="${report.dir}/junit-report"/>
+		<junitreport todir="${report.dir}/junit-report" >
+			<fileset dir="${report.dir}/junit" includes="*.xml"/>
+			<report format="noframes" todir="${report.dir}/junit-report"/>
+		</junitreport>
+	</target>
+
+	<target name="report-master-testsuites" depends="run-master-testsuites">
+		<delete dir="${report.dir}/junit-report" failonerror="false"/>
+		<mkdir dir="${report.dir}/junit-report"/>
+		<junitreport todir="${report.dir}/junit-report" >
+			<fileset dir="${report.dir}/junit" includes="*.xml"/>
+			<report format="noframes" todir="${report.dir}/junit-report"/>
+		</junitreport>
+	</target>
+
+	<target name="create-javadoc">
+		<delete dir="${report.dir}/javadoc" failonerror="false"/>
+		<mkdir dir="${report.dir}/javadoc"/>
+		<javadoc destdir="${report.dir}/javadoc" sourcepath="${src.dir}" overview="${src.dir}/overview.html">
+			<classpath refid="project.classpath"/>
+			<classpath path="build"/>
+			<classpath path="build-test"/>
+		</javadoc>
+		<copy todir="${report.dir}/javadoc">
+			<fileset dir="${src.dir}" includes="**/*.jpg"/>
+		</copy>
+	</target>
+
+	<target name="dist" depends="build">
+		<delete dir="dist" failonerror="false"/>
+		<mkdir dir="dist/lib"/>
+
+		<jar destfile="dist/${archive.name}-${archive.version}.jar" basedir="build" />
+
+		<copy file="dist/${archive.name}-${archive.version}.jar" tofile="dist/${archive.name}.jar" />
+
+		<zip destfile="dist/${archive.name}-${archive.version}-src.zip" basedir="${src.dir}" includes="**/*.java"/>
+	</target>
+
+	<target name="copy-dist" depends="dist">
+		<copy todir="${shared.lib}/chacha">
+			<fileset dir="dist">
+				<include name="*.jar"/>
+				<include name="*.zip"/>
+			</fileset>
+		</copy>
+	</target>
+
+	<target name="dist-reports" depends="dist">
+		<zip destfile="dist/${archive.name}-${archive.version}-reports.zip">
+			<fileset dir="${report.dir}" includes="**/*"/>
+		</zip>
+	</target>
+
+	<target name="copy-dependencies">
+		<copy todir="target/dependencies">
+			<path refid="project.classpath"/>
+		</copy>
+    </target>
+
+	<target name="dist-jar" depends="build">
+		<delete dir="dist" failonerror="false"/>
+		<mkdir dir="dist/lib"/>
+
+		<copy todir="dist/lib">
+			<path refid="dist.classpath" />
+		</copy>
+		
+		<mkdir dir="dist/data"/>
+		<copy todir="dist/data" failonerror="false">
+			<fileset dir="data" erroronmissingdir="false"/>
+		</copy>
+
+		<manifestclasspath property="jar.classpath" jarfile="dist/${archive.name}-${archive.version}.jar">
+		      <classpath>
+		      	<fileset dir="dist/lib"/>
+		      </classpath>
+		</manifestclasspath>
+
+		<jar destfile="dist/${archive.name}-${archive.version}.jar" basedir="build">
+			<manifest>
+				<attribute name="Class-Path" value="${jar.classpath}" />
+				<attribute name="Main-Class" value="${jar.mainclass}" />
+			</manifest>
+		</jar>
+
+		<copy file="dist/${archive.name}-${archive.version}.jar" tofile="dist/${archive.name}.jar" />
+
+		<tar destfile="dist/${archive.name}.tgz" basedir="dist" compression="gzip"/>
+	</target>
+
+	<target name="dist-onejar" depends="build">
+		<delete dir="dist" failonerror="false"/>
+		<mkdir dir="dist/lib"/>
+
+		<pathtofileset pathrefid="dist.classpath" name="dist.fileset" dir="${shared.lib}"/>
+
+		<one-jar destfile="dist/${archive.name}.jar" oneJarMainClass="${jar.mainclass}">
+			<main>
+				<fileset dir="build"/>
+			</main>
+			<lib>
+				<fileset refid="dist.fileset"/>
+			</lib>
+		</one-jar>
+	</target>
+
+	<target name="run-jar" depends="dist-jar">
+		<echo message="Trying to use tools.jar located in ${java.home}/../lib/tools.jar"/>
+		<java jar="dist/${archive.name}-${archive.version}.jar" fork="true" failonerror="true">
+			<jvmarg value="-Xbootclasspath/a:${java.home}/../lib/tools.jar"/>
+			<jvmarg value="-Xmx512m"/>
+			<jvmarg value="-XX:-UseGCOverheadLimit"/>
+		</java>
+	</target>
+
+	<target name="instrument-classes">
+		<delete dir="${cobertura.report.dir}" failonerror="false" />
+		<delete dir="${instrumented.dir}" failonerror="false" />
+
+		<mkdir dir="${cobertura.report.dir}"/>
+		<mkdir dir="${instrumented.dir}"/>
+
+		<cobertura-instrument todir="${instrumented.dir}"
+							  datafile="${cobertura.report.dir}/cobertura.ser">
+		    <fileset dir="${build.dir}">
+		        <include name="**/*.class" />
+		        <exclude name="**/*Test*.class" />
+		    </fileset>
+		</cobertura-instrument>
+	</target>
+
+	<target name="report-coverage" depends="build,build-tests,instrument-classes,report-tests">
+		<cobertura-report format="html"
+						  destdir="${cobertura.report.dir}" srcdir="${src.dir}"
+						  datafile="${cobertura.report.dir}/cobertura.ser"/>
+	</target>
+
+	<target name="report-coverage-xml" depends="build,build-tests,instrument-classes,report-tests">
+		<cobertura-report format="xml"
+						  destdir="${cobertura.report.dir}" srcdir="${src.dir}"
+						  datafile="${cobertura.report.dir}/cobertura.ser"/>
+	</target>
+
+	<target name="dist-war" depends="build">
+
+		<delete file="${dist.war}" failonerror="false"/>
+		<mkdir dir="dist"/>
+
+		<delete dir="temp-war-deps" failonerror="false"/>
+		<mkdir dir="temp-war-deps"/>
+
+		<copy todir="temp-war-deps" flatten="true">
+			<path refid="webapp.classpath.fileset"/>
+		</copy>
+
+		<war destfile="${dist.war}" webxml="${conf.web.dir}/web.xml">
+			<classes dir="${build.dir}"/>
+			<webinf dir="${conf.web.dir}">
+				<include name="*.xml"/>
+				<include name="*.xls"/>
+				<include name="*.drl"/>
+				<include name="*.properties"/>
+				<include name="*.security-properties"/>
+				<include name="*.policy"/>
+				<include name="*.config"/>
+			</webinf>
+			<lib dir="temp-war-deps"/>
+			<fileset dir="${conf.jsp.dir}" erroronmissingdir="no">
+				<include name="**/*"/>
+			</fileset>
+		</war>
+		<delete dir="temp-war-deps"/>
+	</target>
+
+	<target name="all" depends="build,report-tests,dist,create-javadoc"/>
+
+	<target name="console" depends="build, build-tests">
+		<java classname="groovy.ui.Console" maxmemory="1g" fork="true">
+			<classpath>
+				<path path="build"/>
+				<path path="build-test"/>
+				<path refid="project.classpath"/>
+				<path refid="groovy.classpath"/>
+			</classpath>
+		</java>
+	</target>
+
+
+</project>
