@@ -1,0 +1,9 @@
+<?xml version="1.0"?>
+<project basedir=".">
+
+	<path id="ant-contrib.classpath">
+		<pathelement location="${shared.lib}/ant-extensions/ant-contrib-1.0b3.jar" />
+	</path>
+
+	<taskdef resource="net/sf/antcontrib/antcontrib.properties" classpathref="ant-contrib.classpath" />
+</project>
