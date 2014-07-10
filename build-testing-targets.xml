@@ -1,0 +1,119 @@
+<?xml version="1.0"?>
+<project default="all" basedir=".">
+	<target name="-missing-test-param" unless="test">
+		<echo message="Missing test param: Specify it on the command-line by using -Dtest=NameOfClass"/>
+	</target>
+
+	<path id="test.path">
+		<pathelement path="${instrumented.dir}"/>
+		<pathelement path="build"/>
+		<pathelement path="build-test"/>
+		<path refid="project.classpath"/>
+		<path refid="cobertura.classpath" />
+		<pathelement path="${shared.lib}/clover-ant-2.3.2/lib/clover.jar" />
+		<pathelement path="${jdk.lib}/tools.jar"/>
+	</path>
+
+	<path id="test.classes.path">
+		<fileset dir="build-test">
+			<include name="**/*Test.class"/>
+			<include name="**/*Tests.class"/>
+			<include name="**/Test*.class"/>
+			<include name="**/*Spec.class"/>
+			<exclude name="**/*$*.class"/>
+		</fileset>
+	</path>
+
+	<macrodef name="do-testing">
+		<attribute name="format" default="xml" />
+		<element name="test-description" optional="false"/>
+		<sequential>
+			<delete dir="${report.dir}/junit" failonerror="false"/>
+			<mkdir dir="${report.dir}/junit"/>
+			<junit printsummary="withOutAndErr" showoutput="yes" maxmemory="1024m">
+				<sysproperty key="net.sourceforge.cobertura.datafile" value="${cobertura.report.dir}/cobertura.ser" />
+				<sysproperty key="java.protocol.handler.pkgs" value="com.chacha.protocol"/>
+
+				<classpath>
+					<path refid="test.path"/>
+				</classpath>
+
+				<formatter type="@{format}"/>
+
+				<test-description/>
+			</junit>
+		</sequential>
+	</macrodef>
+
+
+	<macrodef name="test-one-class">
+		<attribute name="classname"/>
+		<attribute name="format" default="xml"/>
+		<sequential>
+			<do-testing format="@{format}">
+				<test-description>
+					<test fork="yes" todir="${report.dir}/junit" name="@{classname}" unless="methods"/>
+					<test fork="yes" todir="${report.dir}/junit" name="@{classname}" methods="${methods}" if="methods"/>
+				</test-description>
+			</do-testing>
+		</sequential>
+	</macrodef>
+
+	<macrodef name="test-classes">
+		<attribute name="format" default="xml"/>
+		<attribute name="tests" />
+		<sequential>
+			<do-testing format="@{format}">
+				<test-description>
+					<batchtest fork="yes" todir="${report.dir}/junit">
+						<path refid="@{tests}"/>
+					</batchtest>
+				</test-description>
+			</do-testing>
+		</sequential>
+	</macrodef>
+
+	<target name="test" depends="run-test"/>
+	<target name="run-test" depends="build-tests">
+		<path id="this.one.test.path">
+			<fileset dir="build-test">
+				<include name="**/*${test}.class"/>
+				<exclude name="**/*$*.class"/>
+			</fileset>
+		</path>
+
+		<test-classes tests="this.one.test.path" format="xml"/>
+	</target>
+
+	<target name="run-tests" depends="build-tests">
+		<test-classes tests="test.classes.path"/>
+	</target>
+
+	<target name="run-tests-plain" depends="build-tests">
+		<test-classes format="plain" tests="test.classes.path"/>
+	</target>
+
+	<target name="run-tests-xml" depends="build-tests">
+		<test-classes format="xml" tests="test.classes.path"/>
+	</target>
+
+	<target name="run-tests-html" depends="build-tests">
+		<test-classes format="html" tests="test.classes.path"/>
+	</target>
+
+	<target name="run-one-test" depends="build-tests, -missing-test-param">
+		<test-one-class classname="${test}" />
+	</target>
+
+	<target name="run-one-test-plain" depends="build-tests, -missing-test-param">
+		<test-one-class classname="${test}" format="plain"/>
+	</target>
+
+	<target name="run-one-test-html" depends="build-tests, -missing-test-param">
+		<test-one-class classname="${test}" format="html"/>
+	</target>
+
+	<target name="run-one-test-xml" depends="build-tests, -missing-test-param">
+		<test-one-class classname="${test}" format="xml"/>
+	</target>
+</project>
