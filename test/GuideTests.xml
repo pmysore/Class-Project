@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:camel="http://camel.apache.org/schema/spring" xmlns:util="http://www.springframework.org/schema/util"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans
+	   					   http://www.springframework.org/schema/beans/spring-beans-3.0.xsd
+	   					   http://camel.apache.org/schema/spring
+						   http://camel.apache.org/schema/spring/camel-spring-2.5.0.xsd
+	   					   http://www.springframework.org/schema/util
+	   					   http://www.springframework.org/schema/util/spring-util-3.0.xsd">
+
+	<bean id="propertyPlaceholderConfigurer" class="org.springframework.beans.factory.config.PropertyPlaceholderConfigurer">
+		<property name="locations">
+			<list>
+				<value>file:test/com/chacha/rm/guide/GuideTests.properties</value>
+			</list>
+		</property>
+	</bean>
+
+	<import resource="classpath*:rabbitmq-broker.xml" />
+	<import resource="classpath*:event-bus.xml" />
+
+	<camel:camelContext id="camelContext">
+		<camel:propertyPlaceholder id="routeProps" location="ref:configProps" />
+		<camel:template id="producerTemplate" />
+		<camel:endpoint id ="sugpEndpoint" uri = "rabbitmq:sugp:key:suggest.remove"/>
+	</camel:camelContext>
+
+</beans>
